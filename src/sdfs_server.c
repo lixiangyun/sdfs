@@ -11,6 +11,8 @@ rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 {
 	static READ_RSP_T  result;
 
+	
+
 	/*
 	 * insert server code here
 	 */
@@ -35,6 +37,14 @@ rpc_open_0x0001_svc(OPEN_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
 
+	result = open(argp->path, argp->flag );
+	if(fd == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+		(void)close(fd);
+	}
+
 	/*
 	 * insert server code here
 	 */
@@ -46,6 +56,15 @@ int *
 rpc_create_0x0001_svc(CREATE_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int fd;
+
+	result = open(argp->path, argp->flag, argp->mode);
+	if(fd == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+		(void)close(fd);
+	}
 
 	/*
 	 * insert server code here
@@ -58,6 +77,27 @@ GETATTR_RSP_T *
 rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static GETATTR_RSP_T  result;
+	struct stat stbuf;
+	int ret;
+
+	ret = lstat(argp->path,&stbuf);
+	if(ret == -1) {
+		result.err = -errno;
+		return &result;
+	}
+
+	result.err = 0;
+
+	result.mode = stbuf.st_mode;
+	result.nlink = stbuf.st_nlink;
+	result.size = stbuf.st_size;
+	result.ino = stbuf.st_ino;
+	result.uid = stbuf.st_uid;
+	result.gid = stbuf.st_gid;
+	result.atime = stbuf.st_atime;
+	result.mtime = stbuf.st_mtime;
+	result.ctime = stbuf.st_ctime;
+
 
 	/*
 	 * insert server code here
@@ -82,6 +122,14 @@ int *
 rpc_access_0x0001_svc(ACCESS_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
+
+	ret = access(argp->path, argp->mask);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -94,7 +142,20 @@ int *
 rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
 
+	if (S_ISFIFO(argp->mode))
+		ret = mkfifo(argp->path, argp->mode);
+	else
+		ret = mknod(argp->path, argp->mode, argp->dev);
+	
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
+
+	
 	/*
 	 * insert server code here
 	 */
@@ -106,6 +167,14 @@ int *
 rpc_mkdir_0x0001_svc(MKDIR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
+
+	ret = mkdir(argp->path, argp->mode);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -118,6 +187,14 @@ int *
 rpc_unlink_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
+
+	ret = unlink(*argp);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -130,6 +207,14 @@ int *
 rpc_rmdir_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
+
+	ret = rmdir(*argp);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -143,6 +228,15 @@ rpc_symlink_0x0001_svc(SYMLINK_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
 
+	int ret;
+
+	ret = symlink(argp->from, argp->to);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
+
 	/*
 	 * insert server code here
 	 */
@@ -154,6 +248,15 @@ int *
 rpc_rename_0x0001_svc(RENAME_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+
+	int ret;
+
+	ret = rename(argp->from, argp->to);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -167,6 +270,15 @@ rpc_link_0x0001_svc(LINK_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
 
+	int ret;
+
+	ret = link(argp->from, argp->to);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
+
 	/*
 	 * insert server code here
 	 */
@@ -178,6 +290,15 @@ int *
 rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+
+	int ret;
+
+	ret = chmod(argp->path, argp->mode);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -191,6 +312,15 @@ rpc_chown_0x0001_svc(CHOWN_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
 
+	int ret;
+
+	ret = lchown(argp->path, argp->uid, argp->gid);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
+
 	/*
 	 * insert server code here
 	 */
@@ -202,6 +332,13 @@ int *
 rpc_truncate_0x0001_svc(TRUNCATE_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+
+	ret = truncate(argp->path, argp->size);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -226,6 +363,28 @@ STATVFS_RSP_T *
 rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
 	static STATVFS_RSP_T  result;
+	struct statvfs stbuf;
+
+	memset(&stbuf,0,sizeof(struct statvfs));
+
+	ret = statvfs(*argp, &stbuf);
+	if(ret == -1) {
+		result.err = -errno;
+	}else{
+		result.err = 0;
+	}
+
+	result.bsize  = stbuf.f_bsize;
+	result.frsize = stbuf.f_frsize;
+	result.blocks = stbuf.f_blocks;
+	result.bfree  = stbuf.f_bfree;
+	result.bavail = stbuf.f_bavail;
+	result.files  = stbuf.f_files;
+	result.ffree  = stbuf.f_ffree;
+	result.favail = stbuf.f_favail;
+	result.fsid   = stbuf.f_fsid;
+	result.flag   = stbuf.f_flag;
+	result.namemax = stbuf.f_namemax;
 
 	/*
 	 * insert server code here
@@ -238,6 +397,18 @@ int *
 rpc_setxattr_0x0001_svc(SETXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
+
+	ret = lsetxattr(argp->path,
+					argp->name, 
+					argp->value.value_val, 
+					argp->value.value_len, 
+					argp->flag);
+	if(ret == -1) {
+		result = -errno;
+	}else{
+		result = 0;
+	}
 
 	/*
 	 * insert server code here
@@ -250,6 +421,25 @@ GETXATTR_RSP_T *
 rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static GETXATTR_RSP_T  result;
+	static char * value;
+	int ret;
+
+	value = malloc(argp->size);
+	if(value == NULL) 
+	{
+		result.err = -ENOMEM;
+		return &result;
+	}
+
+	ret = lgetxattr(argp->path, argp->name, value, argp->size);
+	if(ret == -1) {
+		result.err = -errno;
+	}else{
+		result.err = 0;
+	}
+
+	result.value.value_len = argp->size;
+	result.value.value_val = value;
 
 	/*
 	 * insert server code here
@@ -262,6 +452,25 @@ LISTXATTR_RSP_T *
 rpc_listxattr_0x0001_svc(LISTXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static LISTXATTR_RSP_T  result;
+	static char * list;
+	int ret;
+
+	list = malloc(argp->size);
+	if(list == NULL) 
+	{
+		result.err = -ENOMEM;
+		return &result;
+	}
+
+	ret = llistxattr(argp->path, list, argp->size);
+	if(ret == -1) {
+		result.err = -errno;
+	}else{
+		result.err = 0;
+	}
+
+	result.value.value_len = argp->size;
+	result.value.value_val = list;
 
 	/*
 	 * insert server code here
@@ -275,6 +484,14 @@ rpc_removexattr_0x0001_svc(REMOVEXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
 
+	int ret = lremovexattr(argp->path, argp->name);
+	if(ret == -1) {
+		result.err = -errno;
+	}else{
+		result.err = 0;
+	}
+
+
 	/*
 	 * insert server code here
 	 */
@@ -286,6 +503,8 @@ int *
 rpc_fallocate_0x0001_svc(FALLOCATE_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+
+	result = -EOPNOTSUPP;
 
 	/*
 	 * insert server code here
