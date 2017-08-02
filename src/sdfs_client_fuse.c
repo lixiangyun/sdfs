@@ -10,14 +10,14 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-pthread_mutex_t m_lock = PTHREAD_MUTEX_INITIALIZER
+pthread_mutex_t m_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define LOCK() (void)pthread_mutex_lock(&m_lock);
 #define ULOCK() (void)pthread_mutex_unlock(&m_lock);
 
-#define MAX_OPEN_NUM 1024
+#define MAX_OPEN_NUM  1024
 #define MAX_FILE_NAME 256
-#define FD_OFFSET 10
+#define FD_OFFSET     10
 
 CLIENT * clnt;
 
@@ -33,10 +33,10 @@ char host[] = "127.0.0.1";
 int clnt_debug = 0 ;
 int clnt_cnt = 0 ;
 
-#define log(path) \ 
-	if(clnt_debug) \ 
+#define log(path) \
+	if(clnt_debug) \
 	{ \
-		printf("No.%-3u [%s:%u] %s", clnt_cnt++, __FUNCTION__,__LINE__,path ); \ 
+		printf("No.%-3u [%s:%u] %s", clnt_cnt++, __FUNCTION__,__LINE__,path ); \
 	}
 
 int sdfs_allocFd(char * path) {
@@ -113,16 +113,19 @@ int sdfs_getattr(const char * path, struct stat * stbuf ) {
 	GETATTR_REQ_T argp;
 
 	log(path);
+	LOCK();
 
 	argp.path = (char *)path;
 
 	result = rpc_getattr_0x0001(&argp, clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+		ULOCK();
 		return -ENOENT;
 	}
 
 	if( result->err ) {
+		ULOCK();
 		return result->err;
 	}
 
@@ -137,6 +140,8 @@ int sdfs_getattr(const char * path, struct stat * stbuf ) {
 	stbuf->st_atime = result->atime;
 	stbuf->st_mtime = result->mtime;
 	stbuf->st_ctime = result->ctime;
+
+	ULOCK();
 
 	return 0;
 }
@@ -155,17 +160,22 @@ int sdfs_readdir(const char * path,
 
 	char buf1[MAX_FILE_NAME];
 
+	LOCK();
+
 	argp.path = (char *) path;
-	argp.size = -1;
+	argp.size = 0xffff;
 	argp.offset = offset;
 
 	result = rpc_readdir_0x0001( &argp, clnt );
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+
+		ULOCK();
 		return -ENOENT;
 	}
 
 	if( result->err ) {
+		ULOCK();
 		return result->err;
 	}
 	
@@ -178,6 +188,8 @@ int sdfs_readdir(const char * path,
 			break;
 	}
 
+	ULOCK();
+
 	return 0;
 }
 
@@ -187,6 +199,8 @@ int sdfs_open(const char * path, struct fuse_file_info * fi) {
 	int fd;
 	int res;
 
+	LOCK();
+
 	fd = sdfs_allocFd((char *) path);
 	if (-1 == fd) {
 		return -errno;
@@ -195,20 +209,25 @@ int sdfs_open(const char * path, struct fuse_file_info * fi) {
 	arg.path = (char *)path;
 	arg.flag = fi->flags;
 
-	result = rpc_open_0x0001(* arg, clnt);
+	result = rpc_open_0x0001(&arg, clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
 		sdfs_freeFd( fd);
+
+		ULOCK();
 		return -ENOENT;
 	}
 
-	if( result->err ) {
+	if( *result ) {
 		sdfs_freeFd( fd);
-		return result->err;
+
+		ULOCK();
+		return *result;
 	}
 
 	fi->fh = fd;
 
+	ULOCK();
 	return 0;
 }
 
@@ -226,6 +245,8 @@ int sdfs_read(const char * path,
 	size_t size_all = 0;
 	off_t offset_tmp = 0;
 
+	LOCK();
+
 	do {
 		if (size > 4096 ) {
 			size_tmp = 4096;
@@ -240,6 +261,7 @@ int sdfs_read(const char * path,
 		result = rpc_read_0x0001( &arg, clnt);
 		if ( result == NULL ) {
 			clnt_perror(clnt, "call failed!");
+			ULOCK();
 
 			if ( size_all > 0 ) {
 				return size_all;
@@ -250,6 +272,7 @@ int sdfs_read(const char * path,
 
 
 		if( result->err ) {
+			ULOCK();
 
 			if ( size_all > 0 ) {
 				return size_all;
@@ -272,6 +295,7 @@ int sdfs_read(const char * path,
 		offset_tmp += size_tmp;
 	} while( size > 0 );
 
+	ULOCK();
 	return size_all;
 }
 
@@ -289,6 +313,8 @@ int sdfs_write(const char * path,
 	size_t size_all = 0 ;
 	off_t offset_tmp = 0;
 
+	LOCK();
+
 	do {
 		size_tmp = (size > 4096 ) ? 4096: size ;
 
@@ -302,6 +328,7 @@ int sdfs_write(const char * path,
 		result = rpc_write_0x0001(&arg, clnt);
 		if ( result == NULL ) {
 			clnt_perror(clnt, "call failed!");
+			ULOCK();
 
 			if ( size_all > 0 ) {
 				return size_all;
@@ -311,6 +338,8 @@ int sdfs_write(const char * path,
 		}
 
 		if( result->err ) {
+
+			ULOCK();
 
 			if ( size_all > 0 ) {
 				return size_all;
@@ -332,6 +361,7 @@ int sdfs_write(const char * path,
 
 	}while(size > 0 );
 
+	ULOCK();
 	return size_all;
 }
 
@@ -343,12 +373,15 @@ int sdfs_access(const char * path, int mask  ) {
 	arg.path = (char *) path;
 	arg.mask = mask;
 
+	LOCK();
+
 	result = rpc_access_0x0001(&arg , clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+		ULOCK();
 		return -ENOENT;
 	}
-
+	ULOCK();
 	return *result;
 }
 
@@ -359,19 +392,24 @@ int sdfs_readlink(const char *path,char * buf, size_t size) {
 	arg.path = (char *)path;
 	arg.size = size;
 
+	LOCK();
+
 	result = rpc_readlink_0x0001(&arg,  clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+		ULOCK();
 		return -ENOENT;
 	}
 
 	if( result->err ) {
+		ULOCK();
 		return result->err;
 	}
 
 	memcpy(buf, result->data.data_val, result->data.data_len);
 	buf[result->data.data_len] = '\0';
 
+	ULOCK();
 	return 0;
 }
 
@@ -384,60 +422,184 @@ int sdfs_mknod(const char* path, mode_t mode, dev_t rdev ) {
 	arg.mode = mode;
 	arg.dev = rdev;
 
-	result = rpc_mknod_0x0001(MKNOD_REQ_T * argp, CLIENT * clnt);
+	LOCK();
+
+	result = rpc_mknod_0x0001(&arg, clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+		ULOCK();
 		return -ENOENT;
 	}
-
+	ULOCK();
 	return *result;
 }
 
 int sdfs_mkdir(const char * path, mode_t mode) {
+	MKDIR_REQ_T arg;
+	int * result;
 
+	arg.path = (char *)path;
+	arg.mode = mode;
 
+	LOCK();
+
+	result = rpc_mkdir_0x0001( &arg, clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+	ULOCK();
+	return *result;
 }
 
 int sdfs_symlink(const char * from, const char * to ) {
+	SYMLINK_REQ_T arg;
+	int * result;
 
+	arg.from = (char *) from;
+	arg.to = (char *) to;
 
+	LOCK();
+
+	result = rpc_symlink_0x0001(&arg, clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+	ULOCK();
+	return *result;
 }
 
 int sdfs_unlink(const char * path) {
+	int * result;
+	char * filename = (char *)path;
 
+	LOCK();
+
+	result = rpc_unlink_0x0001(&filename, clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+	ULOCK();
+	return *result;
 }
 
 int sdfs_rmdir(const char * path) {
 	int * result;
 	char * filename = (char *)path;
 
+	LOCK();
+
 	result = rpc_rmdir_0x0001(&filename,  clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+		ULOCK();
 		return -ENOENT;
 	}
-
+	ULOCK();
 	return *result;
 }
 
 int sdfs_rename(const char * from, const char * to) {
+	RENAME_REQ_T arg;
+	int * result;
 
+	arg.from = (char *) from;
+	arg.to = (char *) to;
+
+	LOCK();
+
+	result = rpc_rename_0x0001(&arg, clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+	ULOCK();
+	return *result;	
 }
 
 int sdfs_link(const char * from, const char * to) {
 
+	LINK_REQ_T arg;
+	int * result;
+
+	arg.from = (char *) from;
+	arg.to = (char *) to;
+
+	LOCK();
+
+	result = rpc_link_0x0001(&arg, clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+	ULOCK();
+	return *result;	
 }
 
 int sdfs_chmod(const char *path, mode_t mode) {
+	CHMOD_REQ_T arg;
+	int * result;
 
+	arg.path = (char *) path;
+	arg.mode = mode;
+	
+	LOCK();
+
+	result = rpc_chmod_0x0001(&arg, clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+	ULOCK();
+	return *result;	
 }
 
 int sdfs_chown(const char *path, uid_t uid, gid_t gid) {
+	CHOWN_REQ_T arg;
+	int * result;
 
+	arg.path = (char *)path;
+	arg.uid = uid;
+	arg.gid = gid;
+	
+	LOCK();
+
+	result = rpc_chown_0x0001(&arg, clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+	ULOCK();
+	return *result;
 }
 
 int sdfs_truncate(const char *path, off_t size ) {
+	TRUNCATE_REQ_T arg;
+	int * result;
 
+	arg.path = (char *)path;
+	arg.size = size;
+
+	LOCK();
+
+	result = rpc_truncate_0x0001(&arg,  clnt);
+	if ( result == NULL ) {
+		clnt_perror(clnt, "call failed!");
+		ULOCK();
+		return -ENOENT;
+	}
+
+	ULOCK();
+	return *result;
 }
 
 int sdfs_statfs(const char * path, struct statvfs *stbuf) {
@@ -445,13 +607,17 @@ int sdfs_statfs(const char * path, struct statvfs *stbuf) {
 	STATVFS_RSP_T * result;
 	char *filename = (char *) path;
 
+	LOCK();
+
 	result = rpc_statvfs_0x0001( &filename, clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+		ULOCK();
 		return -ENOENT;
 	}
 
 	if( result->err ) {
+		ULOCK();
 		return result->err;
 	}
 
@@ -469,10 +635,11 @@ int sdfs_statfs(const char * path, struct statvfs *stbuf) {
 	stbuf->f_flag = result->flag;
 	stbuf->f_namemax = result->namemax;
 
+	ULOCK();
 	return 0;
 }
 
-int sdfs_fsync(const char * path) {
+int sdfs_fsync(const char * path, int isdatasync, struct fuse_file_info * fi) {
 
 	log(path);
 
@@ -487,9 +654,14 @@ int sdfs_create(const char *path, mode_t mode, struct fuse_file_info * fi)
 	int * result;
 	int fd;
 
+	LOCK();
+
 	fd = sdfs_allocFd((char *) path);
 	if (-1 == fd) 
+	{
+		ULOCK();
 		return -errno;
+	}
 
 	arg.path = (char *)path;
 	arg.mode = mode;
@@ -500,16 +672,21 @@ int sdfs_create(const char *path, mode_t mode, struct fuse_file_info * fi)
 		clnt_perror(clnt, "call failed!");
 
 		sdfs_freeFd( fd);
+
+		ULOCK();
 		return -ENOENT;
 	}
 
-	if( result->err ) {
+	if( *result ) {
 		sdfs_freeFd( fd);
-		return result->err;
+
+		ULOCK();
+		return *result;
 	}
 
 	fi->fh = fd;
 
+	ULOCK();
 	return 0;
 }
 
@@ -536,12 +713,17 @@ int sdfs_setxattr(const char *path,
 	arg.value.value_val = value;
 	arg.value.value_len = size;
 
+	LOCK();
+
 	result = rpc_setxattr_0x0001(&arg, clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+
+		ULOCK();
 		return -ENOENT;
 	}
 
+	ULOCK();
 	return *result;
 }
 
@@ -561,7 +743,6 @@ int sdfs_listxattr(const char *path, char * list, size_t size)
 
 int sdfs_removexattr(const char * path, const char * name)
 {
-
 
 
 }
@@ -586,19 +767,27 @@ int sdfs_opendir(const char * path, struct fuse_file_info * fi )
 	arg.size = 0;
 	arg.offset = 0;
 
+	LOCK();
+
 	result = rpc_readdir_0x0001(&arg,  clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+
+		ULOCK();
 		return -ENOENT;
 	}
 
 	if( result->err ) {
+		ULOCK();
 		return result->err;
 	}
 
 	d = (struct sdfs_dir_p *)malloc(sizeof(struct sdfs_dir_p));
 	if (NULL == d ) 
+	{
+		ULOCK();
 		return -ENOMEM;
+	}
 
 	strncpy(d->path, path, MAX_FILE_NAME + 1);
 
@@ -606,6 +795,7 @@ int sdfs_opendir(const char * path, struct fuse_file_info * fi )
 
 	fi->fh = (unsigned long)d;
 
+	ULOCK();
 	return 0;
 }
 
@@ -628,7 +818,7 @@ int sdfs_fgetattr(const char * path,
 	return sdfs_getattr(path, stbuf);
 }
 
-int sdfs_ftruncate(const char *path, off_t size )
+int sdfs_ftruncate(const char *path, off_t size , struct fuse_file_info * fi)
 {
 	return sdfs_truncate( path,  size);
 }
@@ -659,12 +849,17 @@ int sdfs_fallocate(const char *path,
 	arg.offset = offset;
 	arg.length = length;
 
+	LOCK();
+
 	result = rpc_fallocate_0x0001(&arg,clnt);
 	if ( result == NULL ) {
 		clnt_perror(clnt, "call failed!");
+
+		ULOCK();
 		return -ENOENT;
 	}
 
+	ULOCK();
 	return *result;
 }
 

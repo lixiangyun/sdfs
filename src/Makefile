@@ -13,23 +13,23 @@ SOURCES_SVC.h =
 SOURCES.x = sdfs.x
 
 TARGETS_SVC.c = sdfs_svc.c sdfs_server.c sdfs_xdr.c 
-TARGETS_CLNT.c = sdfs_clnt.c sdfs_client.c sdfs_xdr.c 
+TARGETS_CLNT.c = sdfs_clnt.c sdfs_client.c sdfs_xdr.c sdfs_client_fuse.c
 TARGETS = sdfs.h sdfs_xdr.c sdfs_clnt.c sdfs_svc.c sdfs_client.c sdfs_server.c
 
 OBJECTS_CLNT = $(SOURCES_CLNT.c:%.c=%.o) $(TARGETS_CLNT.c:%.c=%.o)
 OBJECTS_SVC = $(SOURCES_SVC.c:%.c=%.o) $(TARGETS_SVC.c:%.c=%.o)
 # Compiler flags 
 
-CFLAGS += -g 
-LDLIBS += -lnsl
+CFLAGS += -g -D_FILE_OFFSET_BITS=64
+LDLIBS += -lfuse -lpthread -rdynamic
 RPCGENFLAGS = 
 
 # Targets 
 
 all : $(CLIENT) $(SERVER)
 
-$(TARGETS) : $(SOURCES.x) 
-	rpcgen $(RPCGENFLAGS) $(SOURCES.x)
+#$(TARGETS) : $(SOURCES.x) 
+#	rpcgen $(RPCGENFLAGS) $(SOURCES.x)
 
 $(OBJECTS_CLNT) : $(SOURCES_CLNT.c) $(SOURCES_CLNT.h) $(TARGETS_CLNT.c) 
 
@@ -42,5 +42,5 @@ $(SERVER) : $(OBJECTS_SVC)
 	$(LINK.c) -o $(SERVER) $(OBJECTS_SVC) $(LDLIBS)
 
  clean:
-	 $(RM) core $(TARGETS) $(OBJECTS_CLNT) $(OBJECTS_SVC) $(CLIENT) $(SERVER)
+	 $(RM) core  $(OBJECTS_CLNT) $(OBJECTS_SVC) $(CLIENT) $(SERVER)
 

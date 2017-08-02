@@ -169,6 +169,7 @@ sdfs_prog_0x0001(char *host)
 #endif	 /* DEBUG */
 }
 
+#if 0
 
 int
 main (int argc, char *argv[])
@@ -183,3 +184,6 @@ main (int argc, char *argv[])
 	sdfs_prog_0x0001 (host);
 exit (0);
 }
+
+#endif
+

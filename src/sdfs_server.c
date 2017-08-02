@@ -6,12 +6,117 @@
 
 #include "sdfs.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <errno.h>
+#include <sys/time.h>
+#include <sys/statvfs.h>
+#include <pthread.h>
+#include <attr/xattr.h>
+
+
+typedef  struct membuf {
+	char * pbuf;
+	int size;
+}MEM_BUF_S;
+
+#define DEFINE_BUF(mbuf) static MEM_BUF_S mbuf = {NULL,0};
+
+#define RENEW_BUF(mbuf, resize) \
+	do { \
+		if(mbuf.size < resize) \
+		{ \
+			if(mbuf.pbuf) \
+				mbuf.pbuf = realloc(mbuf.pbuf, 2*resize); \
+			else \
+				mbuf.pbuf = malloc( 2*resize); \
+			\
+			if(NULL == mbuf.pbuf) \
+			{ \
+				printf("alloc failed!"); \
+				exit(-1); \
+			} \
+			mbuf.size = 2*resize; \
+		} \
+	}while(0)
+
+pthread_mutex_t m_lock = PTHREAD_MUTEX_INITIALIZER;
+
+#define LOCK() (void)pthread_mutex_lock(&m_lock);
+#define ULOCK() (void)pthread_mutex_unlock(&m_lock);
+
+#define MAX_OPEN_NUM  1024
+#define MAX_FILE_NAME 256
+
+
+char g_stHome[MAX_FILE_NAME] = {'\0'};
+
+#define ROOT_PATH g_stHome
+
+int clnt_debug = 0 ;
+int clnt_cnt = 0 ;
+
+#define log(path) \
+	if(clnt_debug) \
+	{ \
+		printf("No.%-3u [%s:%u] %s", clnt_cnt++, __FUNCTION__,__LINE__,path ); \
+	}
+
+#define RLDIR(path) \
+	do { \
+			char buf[MAX_FILE_NAME]; \
+			(void)snprintf(buf,MAX_FILE_NAME,".%s",path); \
+			(void)strncpy(path,buf,MAX_FILE_NAME); \
+			log(path); \
+		}while(0)
+
+#define DEBUG(rqstp) \
+	if(clnt_debug > 1) \
+	{ \
+		printf("prog: %lu \r\n", rqstp->rq_prog); \
+		printf("vers: %lu \r\n", rqstp->rq_vers); \
+		printf("proc: %lu \r\n", rqstp->rq_proc); \
+		printf("xprt: %p \r\n", rqstp->rq_xprt); \
+	}
+
+
 READ_RSP_T *
 rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 {
 	static READ_RSP_T  result;
-
+	int fd;
+	int ret;
 	
+	DEFINE_BUF(mbuf);
+	RENEW_BUF(mbuf, argp->size);
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	fd = open(argp->path,O_RDONLY);
+	if(fd == -1) {
+		result.err = -errno;
+		return &result;
+	}else{
+		result.err = 0;
+	}
+
+	ret = pread(fd,mbuf.pbuf,argp->size,argp->offset);
+	if(ret == -1) {
+		result.err = -errno;
+	}else{
+		result.err = 0;
+	}
+
+	(void)close(fd);
+
+	result.data.data_val = mbuf.pbuf;
+	result.data.data_len = ret;
+	result.size = ret;
 
 	/*
 	 * insert server code here
@@ -24,6 +129,28 @@ WRITE_RSP_T *
 rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 {
 	static WRITE_RSP_T  result;
+	int fd, ret;
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	fd = open(argp->path,O_RDONLY);
+	if(fd == -1) {
+		result.err = -errno;
+		return &result;
+	}else{
+		result.err = 0;
+	}
+
+	ret = pwrite(fd, argp->data.data_val,argp->data.data_len, argp->offset );
+	if(ret == -1) {
+		result.err = -errno;
+	}else{
+		result.err = 0;
+		result.size = ret;
+	}
+
+	(void)close(fd);
 
 	/*
 	 * insert server code here
@@ -36,8 +163,12 @@ int *
 rpc_open_0x0001_svc(OPEN_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int fd;
 
-	result = open(argp->path, argp->flag );
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	fd = open(argp->path, argp->flag );
 	if(fd == -1) {
 		result = -errno;
 	}else{
@@ -58,7 +189,10 @@ rpc_create_0x0001_svc(CREATE_REQ_T *argp, struct svc_req *rqstp)
 	static int  result;
 	int fd;
 
-	result = open(argp->path, argp->flag, argp->mode);
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	fd = open(argp->path, argp->flag, argp->mode);
 	if(fd == -1) {
 		result = -errno;
 	}else{
@@ -79,6 +213,9 @@ rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 	static GETATTR_RSP_T  result;
 	struct stat stbuf;
 	int ret;
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
 
 	ret = lstat(argp->path,&stbuf);
 	if(ret == -1) {
@@ -110,6 +247,52 @@ READDIR_RSP_T *
 rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static READDIR_RSP_T  result;
+	DIR * dp;
+	struct dirent * de;
+	int remainsize;
+	int usedsize;
+
+	DEFINE_BUF(mbuf);
+	RENEW_BUF(mbuf, argp->size);
+
+	remainsize = mbuf.size - 1;
+	usedsize = 0;
+	
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	dp = opendir(argp->path);
+	if(dp == NULL) 
+	{
+		result.err = -errno;
+		return &result;
+	}
+
+	seekdir(dp , argp->offset);
+	result.err = 0;
+
+	while((de = readdir(dp)) != NULL )
+	{
+		int len = strlen(de->d_name) + 1;
+
+		if ( remainsize < len ) 
+		{
+			RENEW_BUF(mbuf, 2 * mbuf.size );
+			remainsize = mbuf.size - 1;
+		}
+
+		snprintf(mbuf.pbuf + usedsize, remainsize, "%s\n" , de->d_name );
+
+		remainsize -= len;
+		usedsize += len;
+	}
+
+	result.size = usedsize;
+	result.data.data_len = usedsize;
+	result.data.data_val = mbuf.pbuf;
+	
+	closedir(dp);
 
 	/*
 	 * insert server code here
@@ -123,6 +306,9 @@ rpc_access_0x0001_svc(ACCESS_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
 	int ret;
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
 
 	ret = access(argp->path, argp->mask);
 	if(ret == -1) {
@@ -143,6 +329,9 @@ rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
 	int ret;
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
 
 	if (S_ISFIFO(argp->mode))
 		ret = mkfifo(argp->path, argp->mode);
@@ -169,6 +358,9 @@ rpc_mkdir_0x0001_svc(MKDIR_REQ_T *argp, struct svc_req *rqstp)
 	static int  result;
 	int ret;
 
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
 	ret = mkdir(argp->path, argp->mode);
 	if(ret == -1) {
 		result = -errno;
@@ -188,6 +380,9 @@ rpc_unlink_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
 	static int  result;
 	int ret;
+
+	RLDIR(*argp);
+	DEBUG(rqstp);
 
 	ret = unlink(*argp);
 	if(ret == -1) {
@@ -209,6 +404,9 @@ rpc_rmdir_0x0001_svc(char **argp, struct svc_req *rqstp)
 	static int  result;
 	int ret;
 
+	RLDIR(*argp);
+	DEBUG(rqstp);
+
 	ret = rmdir(*argp);
 	if(ret == -1) {
 		result = -errno;
@@ -227,8 +425,12 @@ int *
 rpc_symlink_0x0001_svc(SYMLINK_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
-
 	int ret;
+
+	RLDIR(argp->from);
+	RLDIR(argp->to);
+
+	DEBUG(rqstp);
 
 	ret = symlink(argp->from, argp->to);
 	if(ret == -1) {
@@ -248,8 +450,12 @@ int *
 rpc_rename_0x0001_svc(RENAME_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
-
 	int ret;
+
+	RLDIR(argp->from);
+	RLDIR(argp->to);
+
+	DEBUG(rqstp);
 
 	ret = rename(argp->from, argp->to);
 	if(ret == -1) {
@@ -269,8 +475,12 @@ int *
 rpc_link_0x0001_svc(LINK_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
-
 	int ret;
+
+	RLDIR(argp->from);
+	RLDIR(argp->to);
+
+	DEBUG(rqstp);
 
 	ret = link(argp->from, argp->to);
 	if(ret == -1) {
@@ -290,8 +500,11 @@ int *
 rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
-
 	int ret;
+
+	RLDIR(argp->path);
+
+	DEBUG(rqstp);
 
 	ret = chmod(argp->path, argp->mode);
 	if(ret == -1) {
@@ -311,8 +524,10 @@ int *
 rpc_chown_0x0001_svc(CHOWN_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
-
 	int ret;
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
 
 	ret = lchown(argp->path, argp->uid, argp->gid);
 	if(ret == -1) {
@@ -332,6 +547,10 @@ int *
 rpc_truncate_0x0001_svc(TRUNCATE_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
 
 	ret = truncate(argp->path, argp->size);
 	if(ret == -1) {
@@ -352,6 +571,9 @@ rpc_readlink_0x0001_svc(READLINK_REQ_T *argp, struct svc_req *rqstp)
 {
 	static READLINK_RSP_T  result;
 
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
 	/*
 	 * insert server code here
 	 */
@@ -364,6 +586,10 @@ rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
 	static STATVFS_RSP_T  result;
 	struct statvfs stbuf;
+	int ret;
+
+	RLDIR(*argp);
+	DEBUG(rqstp);
 
 	memset(&stbuf,0,sizeof(struct statvfs));
 
@@ -399,6 +625,9 @@ rpc_setxattr_0x0001_svc(SETXATTR_REQ_T *argp, struct svc_req *rqstp)
 	static int  result;
 	int ret;
 
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
 	ret = lsetxattr(argp->path,
 					argp->name, 
 					argp->value.value_val, 
@@ -421,17 +650,16 @@ GETXATTR_RSP_T *
 rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static GETXATTR_RSP_T  result;
-	static char * value;
 	int ret;
 
-	value = malloc(argp->size);
-	if(value == NULL) 
-	{
-		result.err = -ENOMEM;
-		return &result;
-	}
+	DEFINE_BUF(mbuf);
+	RENEW_BUF(mbuf, argp->size);
 
-	ret = lgetxattr(argp->path, argp->name, value, argp->size);
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	ret = lgetxattr(argp->path, argp->name, mbuf.pbuf, argp->size);
 	if(ret == -1) {
 		result.err = -errno;
 	}else{
@@ -439,7 +667,7 @@ rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 	}
 
 	result.value.value_len = argp->size;
-	result.value.value_val = value;
+	result.value.value_val = mbuf.pbuf;
 
 	/*
 	 * insert server code here
@@ -452,17 +680,16 @@ LISTXATTR_RSP_T *
 rpc_listxattr_0x0001_svc(LISTXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static LISTXATTR_RSP_T  result;
-	static char * list;
 	int ret;
 
-	list = malloc(argp->size);
-	if(list == NULL) 
-	{
-		result.err = -ENOMEM;
-		return &result;
-	}
+	DEFINE_BUF(mbuf);
+	RENEW_BUF(mbuf, argp->size);
 
-	ret = llistxattr(argp->path, list, argp->size);
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	ret = llistxattr(argp->path, mbuf.pbuf, argp->size);
 	if(ret == -1) {
 		result.err = -errno;
 	}else{
@@ -470,7 +697,7 @@ rpc_listxattr_0x0001_svc(LISTXATTR_REQ_T *argp, struct svc_req *rqstp)
 	}
 
 	result.value.value_len = argp->size;
-	result.value.value_val = list;
+	result.value.value_val = mbuf.pbuf;
 
 	/*
 	 * insert server code here
@@ -483,12 +710,16 @@ int *
 rpc_removexattr_0x0001_svc(REMOVEXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
 	static int  result;
+	int ret;
 
-	int ret = lremovexattr(argp->path, argp->name);
+	RLDIR(argp->path);
+	DEBUG(rqstp);
+
+	ret = lremovexattr(argp->path, argp->name);
 	if(ret == -1) {
-		result.err = -errno;
+		result = -errno;
 	}else{
-		result.err = 0;
+		result = 0;
 	}
 
 
@@ -505,6 +736,9 @@ rpc_fallocate_0x0001_svc(FALLOCATE_REQ_T *argp, struct svc_req *rqstp)
 	static int  result;
 
 	result = -EOPNOTSUPP;
+
+	RLDIR(argp->path);
+	DEBUG(rqstp);
 
 	/*
 	 * insert server code here
