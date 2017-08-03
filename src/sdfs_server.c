@@ -29,6 +29,7 @@ typedef  struct membuf {
 
 #define RENEW_BUF(mbuf, resize) \
 	do { \
+		resize = (resize < 4096 ) ? 4096 : resize; \
 		if(mbuf.size < resize) \
 		{ \
 			if(mbuf.pbuf) \
@@ -74,14 +75,14 @@ int clnt_cnt = 0 ;
 #define RLDIR(path) \
 	do { \
 		char buf[MAX_FILE_NAME]; \
-		(void)snprintf(rlpath,MAX_FILE_NAME,".%s",path); \
+		(void)snprintf(rlpath,MAX_FILE_NAME,"%s%s",".",path); \
 		log(rlpath); \
 	}while(0)
 
 #define RLDIR2(rlpath,path) \
 	do { \
 		char buf[MAX_FILE_NAME]; \
-		(void)snprintf(rlpath,MAX_FILE_NAME,".%s",path); \
+		(void)snprintf(rlpath,MAX_FILE_NAME,"%s%s",".",path); \
 		log(rlpath); \
 	}while(0)
 
@@ -94,11 +95,19 @@ int clnt_cnt = 0 ;
 		printf("xprt: %p \r\n", rqstp->rq_xprt); \
 	}
 
+#define CHECKERR(err) \
+	if(clnt_debug > 1) \
+	{ \
+		if ( err ) \
+			printf("       [%s:%u] return errno %s\r\n", __FUNCTION__,__LINE__,strerror(err) ); \
+		else \
+			printf("       [%s:%u] return ok \r\n", __FUNCTION__,__LINE__ ); \
+	}
 
 READ_RSP_T *
 rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static READ_RSP_T  result;
 	int fd;
 	int ret;
@@ -112,6 +121,7 @@ rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 	fd = open(rlpath,O_RDONLY);
 	if(fd == -1) {
 		result.err = -errno;
+		CHECKERR(result.err);
 		return &result;
 	}else{
 		result.err = 0;
@@ -130,13 +140,15 @@ rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 	result.data.data_len = ret;
 	result.size = ret;
 
+	CHECKERR(result.err);
+
 	return &result;
 }
 
 WRITE_RSP_T *
 rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static WRITE_RSP_T  result;
 	int fd, ret;
 
@@ -146,6 +158,7 @@ rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 	fd = open(rlpath,O_RDONLY);
 	if(fd == -1) {
 		result.err = -errno;
+		CHECKERR(result.err);
 		return &result;
 	}else{
 		result.err = 0;
@@ -161,13 +174,15 @@ rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 
 	(void)close(fd);
 
+	CHECKERR(result.err);
+
 	return &result;
 }
 
 int *
 rpc_open_0x0001_svc(OPEN_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int fd;
 
@@ -182,13 +197,14 @@ rpc_open_0x0001_svc(OPEN_REQ_T *argp, struct svc_req *rqstp)
 		(void)close(fd);
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_create_0x0001_svc(CREATE_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int fd;
 
@@ -202,14 +218,15 @@ rpc_create_0x0001_svc(CREATE_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 		(void)close(fd);
 	}
-	
+
+	CHECKERR(result);
 	return &result;
 }
 
 GETATTR_RSP_T *
 rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static GETATTR_RSP_T  result;
 	struct stat stbuf;
 	int ret;
@@ -220,6 +237,7 @@ rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 	ret = lstat(rlpath,&stbuf);
 	if(ret == -1) {
 		result.err = -errno;
+		CHECKERR(result.err);
 		return &result;
 	}
 
@@ -235,13 +253,14 @@ rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 	result.mtime = stbuf.st_mtime;
 	result.ctime = stbuf.st_ctime;
 
+	CHECKERR(result.err);
 	return &result;
 }
 
 READDIR_RSP_T *
 rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static READDIR_RSP_T  result;
 	DIR * dp;
 	struct dirent * de;
@@ -262,6 +281,7 @@ rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 	if(dp == NULL) 
 	{
 		result.err = -errno;
+		CHECKERR(result.err);
 		return &result;
 	}
 
@@ -274,7 +294,8 @@ rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 
 		if ( remainsize < len ) 
 		{
-			RENEW_BUF(mbuf, 2 * mbuf.size );
+			remainsize = 2 * mbuf.size;
+			RENEW_BUF(mbuf, remainsize );
 			remainsize = mbuf.size - 1;
 		}
 
@@ -290,13 +311,14 @@ rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 	
 	closedir(dp);
 
+	CHECKERR(result.err);
 	return &result;
 }
 
 int *
 rpc_access_0x0001_svc(ACCESS_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -310,13 +332,14 @@ rpc_access_0x0001_svc(ACCESS_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -334,13 +357,14 @@ rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_mkdir_0x0001_svc(MKDIR_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -353,14 +377,15 @@ rpc_mkdir_0x0001_svc(MKDIR_REQ_T *argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-	
+
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_unlink_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -374,13 +399,14 @@ rpc_unlink_0x0001_svc(char **argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_rmdir_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -393,7 +419,8 @@ rpc_rmdir_0x0001_svc(char **argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-	
+
+	CHECKERR(result);
 	return &result;
 }
 
@@ -417,6 +444,7 @@ rpc_symlink_0x0001_svc(SYMLINK_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
@@ -440,6 +468,7 @@ rpc_rename_0x0001_svc(RENAME_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
@@ -463,13 +492,14 @@ rpc_link_0x0001_svc(LINK_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -484,13 +514,14 @@ rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_chown_0x0001_svc(CHOWN_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -504,13 +535,14 @@ rpc_chown_0x0001_svc(CHOWN_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 int *
 rpc_truncate_0x0001_svc(TRUNCATE_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -524,13 +556,14 @@ rpc_truncate_0x0001_svc(TRUNCATE_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
 READLINK_RSP_T *
 rpc_readlink_0x0001_svc(READLINK_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static READLINK_RSP_T  result;
 
 	RLDIR(argp->path);
@@ -544,7 +577,7 @@ rpc_readlink_0x0001_svc(READLINK_REQ_T *argp, struct svc_req *rqstp)
 STATVFS_RSP_T *
 rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static STATVFS_RSP_T  result;
 	struct statvfs stbuf;
 	int ret;
@@ -573,13 +606,14 @@ rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 	result.flag   = stbuf.f_flag;
 	result.namemax = stbuf.f_namemax;
 
+	CHECKERR(result.err);
 	return &result;
 }
 
 int *
 rpc_setxattr_0x0001_svc(SETXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+    DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -597,6 +631,7 @@ rpc_setxattr_0x0001_svc(SETXATTR_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
+	CHECKERR(result);
 	return &result;
 }
 
@@ -623,6 +658,7 @@ rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 	result.value.value_len = argp->size;
 	result.value.value_val = mbuf.pbuf;
 
+	CHECKERR(result.err);
 	return &result;
 }
 
@@ -649,6 +685,7 @@ rpc_listxattr_0x0001_svc(LISTXATTR_REQ_T *argp, struct svc_req *rqstp)
 	result.value.value_len = argp->size;
 	result.value.value_val = mbuf.pbuf;
 
+	CHECKERR(result.err);
 	return &result;
 }
 
@@ -668,7 +705,8 @@ rpc_removexattr_0x0001_svc(REMOVEXATTR_REQ_T *argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-	
+
+	CHECKERR(result);
 	return &result;
 }
 

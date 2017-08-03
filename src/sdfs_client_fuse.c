@@ -163,7 +163,7 @@ int sdfs_readdir(const char * path,
 	LOCK();
 
 	argp.path = (char *) path;
-	argp.size = 0xffff;
+	argp.size = -1;
 	argp.offset = offset;
 
 	result = rpc_readdir_0x0001( &argp, clnt );
