@@ -19,6 +19,7 @@
 #include <attr/xattr.h>
 
 
+
 typedef  struct membuf {
 	char * pbuf;
 	int size;
@@ -53,6 +54,7 @@ pthread_mutex_t m_lock = PTHREAD_MUTEX_INITIALIZER;
 #define MAX_FILE_NAME 256
 
 
+
 char g_stHome[MAX_FILE_NAME] = {'\0'};
 
 #define ROOT_PATH g_stHome
@@ -60,19 +62,20 @@ char g_stHome[MAX_FILE_NAME] = {'\0'};
 int clnt_debug = 0 ;
 int clnt_cnt = 0 ;
 
+#define DEFINE_DIR() char rlpath[MAX_FILE_NAME];
+
 #define log(path) \
 	if(clnt_debug) \
 	{ \
-		printf("No.%-3u [%s:%u] %s", clnt_cnt++, __FUNCTION__,__LINE__,path ); \
+		printf("No.%-3u [%s:%u] %s\r\n", clnt_cnt++, __FUNCTION__,__LINE__,path ); \
 	}
 
 #define RLDIR(path) \
 	do { \
-			char buf[MAX_FILE_NAME]; \
-			(void)snprintf(buf,MAX_FILE_NAME,".%s",path); \
-			(void)strncpy(path,buf,MAX_FILE_NAME); \
-			log(path); \
-		}while(0)
+		char buf[MAX_FILE_NAME]; \
+		(void)snprintf(rlpath,MAX_FILE_NAME,".%s",path); \
+		log(rlpath); \
+	}while(0)
 
 #define DEBUG(rqstp) \
 	if(clnt_debug > 1) \
@@ -87,6 +90,7 @@ int clnt_cnt = 0 ;
 READ_RSP_T *
 rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static READ_RSP_T  result;
 	int fd;
 	int ret;
@@ -97,7 +101,7 @@ rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	fd = open(argp->path,O_RDONLY);
+	fd = open(rlpath,O_RDONLY);
 	if(fd == -1) {
 		result.err = -errno;
 		return &result;
@@ -128,13 +132,14 @@ rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 WRITE_RSP_T *
 rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static WRITE_RSP_T  result;
 	int fd, ret;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	fd = open(argp->path,O_RDONLY);
+	fd = open(rlpath,O_RDONLY);
 	if(fd == -1) {
 		result.err = -errno;
 		return &result;
@@ -162,13 +167,14 @@ rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_open_0x0001_svc(OPEN_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int fd;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	fd = open(argp->path, argp->flag );
+	fd = open(rlpath, argp->flag );
 	if(fd == -1) {
 		result = -errno;
 	}else{
@@ -186,13 +192,14 @@ rpc_open_0x0001_svc(OPEN_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_create_0x0001_svc(CREATE_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int fd;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	fd = open(argp->path, argp->flag, argp->mode);
+	fd = open(rlpath, argp->flag, argp->mode);
 	if(fd == -1) {
 		result = -errno;
 	}else{
@@ -210,6 +217,7 @@ rpc_create_0x0001_svc(CREATE_REQ_T *argp, struct svc_req *rqstp)
 GETATTR_RSP_T *
 rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static GETATTR_RSP_T  result;
 	struct stat stbuf;
 	int ret;
@@ -217,7 +225,7 @@ rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = lstat(argp->path,&stbuf);
+	ret = lstat(rlpath,&stbuf);
 	if(ret == -1) {
 		result.err = -errno;
 		return &result;
@@ -246,6 +254,7 @@ rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 READDIR_RSP_T *
 rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static READDIR_RSP_T  result;
 	DIR * dp;
 	struct dirent * de;
@@ -262,7 +271,7 @@ rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	dp = opendir(argp->path);
+	dp = opendir(rlpath);
 	if(dp == NULL) 
 	{
 		result.err = -errno;
@@ -304,13 +313,14 @@ rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_access_0x0001_svc(ACCESS_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = access(argp->path, argp->mask);
+	ret = access(rlpath, argp->mask);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -327,6 +337,7 @@ rpc_access_0x0001_svc(ACCESS_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -334,9 +345,9 @@ rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 	DEBUG(rqstp);
 
 	if (S_ISFIFO(argp->mode))
-		ret = mkfifo(argp->path, argp->mode);
+		ret = mkfifo(rlpath, argp->mode);
 	else
-		ret = mknod(argp->path, argp->mode, argp->dev);
+		ret = mknod(rlpath, argp->mode, argp->dev);
 	
 	if(ret == -1) {
 		result = -errno;
@@ -355,13 +366,14 @@ rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_mkdir_0x0001_svc(MKDIR_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = mkdir(argp->path, argp->mode);
+	ret = mkdir(rlpath, argp->mode);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -378,13 +390,14 @@ rpc_mkdir_0x0001_svc(MKDIR_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_unlink_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(*argp);
 	DEBUG(rqstp);
 
-	ret = unlink(*argp);
+	ret = unlink(rlpath);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -401,13 +414,14 @@ rpc_unlink_0x0001_svc(char **argp, struct svc_req *rqstp)
 int *
 rpc_rmdir_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(*argp);
 	DEBUG(rqstp);
 
-	ret = rmdir(*argp);
+	ret = rmdir(rlpath);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -424,6 +438,7 @@ rpc_rmdir_0x0001_svc(char **argp, struct svc_req *rqstp)
 int *
 rpc_symlink_0x0001_svc(SYMLINK_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -449,6 +464,7 @@ rpc_symlink_0x0001_svc(SYMLINK_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_rename_0x0001_svc(RENAME_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -474,6 +490,7 @@ rpc_rename_0x0001_svc(RENAME_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_link_0x0001_svc(LINK_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -499,6 +516,7 @@ rpc_link_0x0001_svc(LINK_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
@@ -506,7 +524,7 @@ rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 
 	DEBUG(rqstp);
 
-	ret = chmod(argp->path, argp->mode);
+	ret = chmod(rlpath, argp->mode);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -523,13 +541,14 @@ rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_chown_0x0001_svc(CHOWN_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = lchown(argp->path, argp->uid, argp->gid);
+	ret = lchown(rlpath, argp->uid, argp->gid);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -546,13 +565,14 @@ rpc_chown_0x0001_svc(CHOWN_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_truncate_0x0001_svc(TRUNCATE_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = truncate(argp->path, argp->size);
+	ret = truncate(rlpath, argp->size);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -569,6 +589,7 @@ rpc_truncate_0x0001_svc(TRUNCATE_REQ_T *argp, struct svc_req *rqstp)
 READLINK_RSP_T *
 rpc_readlink_0x0001_svc(READLINK_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static READLINK_RSP_T  result;
 
 	RLDIR(argp->path);
@@ -584,6 +605,7 @@ rpc_readlink_0x0001_svc(READLINK_REQ_T *argp, struct svc_req *rqstp)
 STATVFS_RSP_T *
 rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static STATVFS_RSP_T  result;
 	struct statvfs stbuf;
 	int ret;
@@ -593,7 +615,7 @@ rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 
 	memset(&stbuf,0,sizeof(struct statvfs));
 
-	ret = statvfs(*argp, &stbuf);
+	ret = statvfs(rlpath, &stbuf);
 	if(ret == -1) {
 		result.err = -errno;
 	}else{
@@ -622,17 +644,18 @@ rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 int *
 rpc_setxattr_0x0001_svc(SETXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
+        DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = lsetxattr(argp->path,
-					argp->name, 
-					argp->value.value_val, 
-					argp->value.value_len, 
-					argp->flag);
+	ret = lsetxattr(rlpath,
+			argp->name, 
+			argp->value.value_val, 
+			argp->value.value_len, 
+			argp->flag);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -649,8 +672,10 @@ rpc_setxattr_0x0001_svc(SETXATTR_REQ_T *argp, struct svc_req *rqstp)
 GETXATTR_RSP_T *
 rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
+	DEFINE_DIR();
 	static GETXATTR_RSP_T  result;
 	int ret;
+
 
 	DEFINE_BUF(mbuf);
 	RENEW_BUF(mbuf, argp->size);
@@ -659,7 +684,7 @@ rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = lgetxattr(argp->path, argp->name, mbuf.pbuf, argp->size);
+	ret = lgetxattr(rlpath, argp->name, mbuf.pbuf, argp->size);
 	if(ret == -1) {
 		result.err = -errno;
 	}else{
@@ -679,17 +704,17 @@ rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 LISTXATTR_RSP_T *
 rpc_listxattr_0x0001_svc(LISTXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
+	DEFINE_DIR();
 	static LISTXATTR_RSP_T  result;
 	int ret;
 
 	DEFINE_BUF(mbuf);
 	RENEW_BUF(mbuf, argp->size);
 
-
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = llistxattr(argp->path, mbuf.pbuf, argp->size);
+	ret = llistxattr(rlpath, mbuf.pbuf, argp->size);
 	if(ret == -1) {
 		result.err = -errno;
 	}else{
@@ -709,13 +734,14 @@ rpc_listxattr_0x0001_svc(LISTXATTR_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_removexattr_0x0001_svc(REMOVEXATTR_REQ_T *argp, struct svc_req *rqstp)
 {
+	DEFINE_DIR();
 	static int  result;
 	int ret;
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	ret = lremovexattr(argp->path, argp->name);
+	ret = lremovexattr(rlpath, argp->name);
 	if(ret == -1) {
 		result = -errno;
 	}else{
@@ -733,6 +759,7 @@ rpc_removexattr_0x0001_svc(REMOVEXATTR_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_fallocate_0x0001_svc(FALLOCATE_REQ_T *argp, struct svc_req *rqstp)
 {
+	DEFINE_DIR();
 	static int  result;
 
 	result = -EOPNOTSUPP;
