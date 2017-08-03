@@ -59,10 +59,11 @@ char g_stHome[MAX_FILE_NAME] = {'\0'};
 
 #define ROOT_PATH g_stHome
 
-int clnt_debug = 0 ;
+int clnt_debug = 2 ;
 int clnt_cnt = 0 ;
 
 #define DEFINE_DIR() char rlpath[MAX_FILE_NAME];
+#define DEFINE_DIR2(path1) char path1[MAX_FILE_NAME];
 
 #define log(path) \
 	if(clnt_debug) \
@@ -71,6 +72,13 @@ int clnt_cnt = 0 ;
 	}
 
 #define RLDIR(path) \
+	do { \
+		char buf[MAX_FILE_NAME]; \
+		(void)snprintf(rlpath,MAX_FILE_NAME,".%s",path); \
+		log(rlpath); \
+	}while(0)
+
+#define RLDIR2(rlpath,path) \
 	do { \
 		char buf[MAX_FILE_NAME]; \
 		(void)snprintf(rlpath,MAX_FILE_NAME,".%s",path); \
@@ -122,10 +130,6 @@ rpc_read_0x0001_svc(READ_REQ_T *argp, struct svc_req *rqstp)
 	result.data.data_len = ret;
 	result.size = ret;
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -157,10 +161,6 @@ rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 
 	(void)close(fd);
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -182,10 +182,6 @@ rpc_open_0x0001_svc(OPEN_REQ_T *argp, struct svc_req *rqstp)
 		(void)close(fd);
 	}
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -206,11 +202,7 @@ rpc_create_0x0001_svc(CREATE_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 		(void)close(fd);
 	}
-
-	/*
-	 * insert server code here
-	 */
-
+	
 	return &result;
 }
 
@@ -242,11 +234,6 @@ rpc_getattr_0x0001_svc(GETATTR_REQ_T *argp, struct svc_req *rqstp)
 	result.atime = stbuf.st_atime;
 	result.mtime = stbuf.st_mtime;
 	result.ctime = stbuf.st_ctime;
-
-
-	/*
-	 * insert server code here
-	 */
 
 	return &result;
 }
@@ -303,10 +290,6 @@ rpc_readdir_0x0001_svc(READDIR_REQ_T *argp, struct svc_req *rqstp)
 	
 	closedir(dp);
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -326,10 +309,6 @@ rpc_access_0x0001_svc(ACCESS_REQ_T *argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-
-	/*
-	 * insert server code here
-	 */
 
 	return &result;
 }
@@ -355,11 +334,6 @@ rpc_mknod_0x0001_svc(MKNOD_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
-	
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -379,11 +353,7 @@ rpc_mkdir_0x0001_svc(MKDIR_REQ_T *argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-
-	/*
-	 * insert server code here
-	 */
-
+	
 	return &result;
 }
 
@@ -404,10 +374,6 @@ rpc_unlink_0x0001_svc(char **argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -427,36 +393,29 @@ rpc_rmdir_0x0001_svc(char **argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-
-	/*
-	 * insert server code here
-	 */
-
+	
 	return &result;
 }
 
 int *
 rpc_symlink_0x0001_svc(SYMLINK_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+        DEFINE_DIR2(rlfrom);
+	DEFINE_DIR2(rlto);
 	static int  result;
 	int ret;
 
-	RLDIR(argp->from);
-	RLDIR(argp->to);
+	RLDIR2(rlfrom,argp->from);
+	RLDIR2(rlto,argp->to);
 
 	DEBUG(rqstp);
 
-	ret = symlink(argp->from, argp->to);
+	ret = symlink(rlfrom, rlto);
 	if(ret == -1) {
 		result = -errno;
 	}else{
 		result = 0;
 	}
-
-	/*
-	 * insert server code here
-	 */
 
 	return &result;
 }
@@ -464,25 +423,22 @@ rpc_symlink_0x0001_svc(SYMLINK_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_rename_0x0001_svc(RENAME_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+        DEFINE_DIR2(rlfrom);
+	DEFINE_DIR2(rlto);
 	static int  result;
 	int ret;
 
-	RLDIR(argp->from);
-	RLDIR(argp->to);
+	RLDIR2(rlfrom,argp->from);
+	RLDIR2(rlto,argp->to);
 
 	DEBUG(rqstp);
 
-	ret = rename(argp->from, argp->to);
+	ret = rename(rlfrom, rlto);
 	if(ret == -1) {
 		result = -errno;
 	}else{
 		result = 0;
 	}
-
-	/*
-	 * insert server code here
-	 */
 
 	return &result;
 }
@@ -490,25 +446,22 @@ rpc_rename_0x0001_svc(RENAME_REQ_T *argp, struct svc_req *rqstp)
 int *
 rpc_link_0x0001_svc(LINK_REQ_T *argp, struct svc_req *rqstp)
 {
-        DEFINE_DIR();
+        DEFINE_DIR2(rlfrom);
+	DEFINE_DIR2(rlto);
 	static int  result;
 	int ret;
 
-	RLDIR(argp->from);
-	RLDIR(argp->to);
+	RLDIR2(rlfrom,argp->from);
+	RLDIR2(rlto,argp->to);
 
 	DEBUG(rqstp);
 
-	ret = link(argp->from, argp->to);
+	ret = link(rlfrom, rlto);
 	if(ret == -1) {
 		result = -errno;
 	}else{
 		result = 0;
 	}
-
-	/*
-	 * insert server code here
-	 */
 
 	return &result;
 }
@@ -531,10 +484,6 @@ rpc_chmod_0x0001_svc(CHMOD_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -554,10 +503,6 @@ rpc_chown_0x0001_svc(CHOWN_REQ_T *argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-
-	/*
-	 * insert server code here
-	 */
 
 	return &result;
 }
@@ -579,10 +524,6 @@ rpc_truncate_0x0001_svc(TRUNCATE_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -595,9 +536,7 @@ rpc_readlink_0x0001_svc(READLINK_REQ_T *argp, struct svc_req *rqstp)
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	/*
-	 * insert server code here
-	 */
+	// TBD
 
 	return &result;
 }
@@ -634,10 +573,6 @@ rpc_statvfs_0x0001_svc(char **argp, struct svc_req *rqstp)
 	result.flag   = stbuf.f_flag;
 	result.namemax = stbuf.f_namemax;
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -662,10 +597,6 @@ rpc_setxattr_0x0001_svc(SETXATTR_REQ_T *argp, struct svc_req *rqstp)
 		result = 0;
 	}
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -676,10 +607,8 @@ rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 	static GETXATTR_RSP_T  result;
 	int ret;
 
-
 	DEFINE_BUF(mbuf);
 	RENEW_BUF(mbuf, argp->size);
-
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
@@ -693,10 +622,6 @@ rpc_getxattr_0x0001_svc(GETXATTR_REQ_T *argp, struct svc_req *rqstp)
 
 	result.value.value_len = argp->size;
 	result.value.value_val = mbuf.pbuf;
-
-	/*
-	 * insert server code here
-	 */
 
 	return &result;
 }
@@ -724,10 +649,6 @@ rpc_listxattr_0x0001_svc(LISTXATTR_REQ_T *argp, struct svc_req *rqstp)
 	result.value.value_len = argp->size;
 	result.value.value_val = mbuf.pbuf;
 
-	/*
-	 * insert server code here
-	 */
-
 	return &result;
 }
 
@@ -747,12 +668,7 @@ rpc_removexattr_0x0001_svc(REMOVEXATTR_REQ_T *argp, struct svc_req *rqstp)
 	}else{
 		result = 0;
 	}
-
-
-	/*
-	 * insert server code here
-	 */
-
+	
 	return &result;
 }
 
@@ -766,10 +682,8 @@ rpc_fallocate_0x0001_svc(FALLOCATE_REQ_T *argp, struct svc_req *rqstp)
 
 	RLDIR(argp->path);
 	DEBUG(rqstp);
-
-	/*
-	 * insert server code here
-	 */
+	
+	// TBD
 
 	return &result;
 }
