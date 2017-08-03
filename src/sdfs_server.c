@@ -60,7 +60,7 @@ char g_stHome[MAX_FILE_NAME] = {'\0'};
 
 #define ROOT_PATH g_stHome
 
-int clnt_debug = 2 ;
+int clnt_debug = 0 ;
 int clnt_cnt = 0 ;
 
 #define DEFINE_DIR() char rlpath[MAX_FILE_NAME];
@@ -155,7 +155,7 @@ rpc_write_0x0001_svc(WRITE_REQ_T *argp, struct svc_req *rqstp)
 	RLDIR(argp->path);
 	DEBUG(rqstp);
 
-	fd = open(rlpath,O_RDONLY);
+	fd = open(rlpath,O_WRONLY);
 	if(fd == -1) {
 		result.err = -errno;
 		CHECKERR(result.err);
@@ -725,3 +725,20 @@ rpc_fallocate_0x0001_svc(FALLOCATE_REQ_T *argp, struct svc_req *rqstp)
 
 	return &result;
 }
+
+
+void parse_cmd(int argc ,char **argv )
+{
+	int i;
+	
+	for( i = 1 ; i < argc ; i++ )
+	{
+		if (strstr(argv[i], "-d") || strstr(argv[i], "--debug")  )
+		{
+			clnt_debug = 2;
+			printf("DEBUG MODE!\r\n");
+		}
+	}
+}
+
+

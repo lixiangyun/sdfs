@@ -218,10 +218,14 @@ sdfs_prog_0x0001(struct svc_req *rqstp, register SVCXPRT *transp)
 	return;
 }
 
+extern void parse_cmd(int,char **);
+
 int
 main (int argc, char **argv)
 {
 	register SVCXPRT *transp;
+
+	parse_cmd(argc,argv);
 
 	pmap_unset (SDFS_PROG, SDFS_V1);
 
