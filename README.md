@@ -1,5 +1,22 @@
-# sdfs
-Simple distributed file system
+# sdfs v0.01
+Simple distributed file system </br>
+Dependent dev-fuse 2.9.2 & portmap service
+
+## v0.01 Explain
+
+### Features
+
+- Support the standard POSIX interface
+- Support point to point remote file operations
+
+### Scheme
+- Client takes the Posix interface requst by fuse, send requst packages on RPC ways through UDP protocol to the server terminal;
+- Server handler the RPC request and execute the local POSIX interface; The execution result is answered through the UDP protocol to the client .
+
+### Programme
+- Server cluster scheme (master slave replication, file partitioning, service monitoring)
+
+## Development guidance
 
 ### build binary file
 make
