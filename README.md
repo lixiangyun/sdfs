@@ -1,8 +1,8 @@
-# sdfs v0.01
+# sdfs v0.1
 Simple distributed file system </br>
 Dependent dev-fuse 2.9.2 & portmap service
 
-## v0.01 Explain
+## v0.1 Explain
 
 ### Features
 
